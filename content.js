@@ -59,16 +59,6 @@
     }, seconds * 1000);
   }
 
-  // Single source of truth for overlay visibility lives in chrome.storage.local.
-  // Writers call this; the storage.onChanged listener below applies the change to the DOM
-  // in every tab so the overlay state stays in sync globally.
-  function setOverlayVisible(visible) {
-    if (!isExtensionContextValid()) return;
-    try {
-      chrome.storage.local.set({ overlayVisible: !!visible });
-    } catch (_) { /* extension context invalidated mid-write — ignore */ }
-  }
-
   function $(sel, parent) { return (parent || root).querySelector(sel); }
 
   function createOverlay() {
@@ -107,7 +97,7 @@
     resumeLabelEl = $('.jf-resume-label');
     resumeMenuEl = $('.jf-resume-menu');
 
-    $('.jf-close').addEventListener('click', () => setOverlayVisible(false));
+    $('.jf-close').addEventListener('click', hideOverlay);
     $('[data-action="check"]').addEventListener('click', onCheckClick);
     $('[data-action="log"]').addEventListener('click', onLogClick);
     $('.jf-drag').addEventListener('mousedown', onDragStart);
@@ -143,6 +133,16 @@
     if (!root) return;
     root.setAttribute('data-jf-hidden', 'true');
     closeResumeMenu();
+  }
+
+  function toggleOverlay() {
+    if (!root) {
+      createOverlay();
+      showOverlay();
+      return;
+    }
+    if (root.getAttribute('data-jf-hidden') === 'true') showOverlay();
+    else hideOverlay();
   }
 
   function onDragStart(e) {
@@ -363,28 +363,19 @@
     closeResumeMenu();
   }
 
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || !msg.type) return;
+    if (msg.type === 'TOGGLE') toggleOverlay();
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    if (changes.overlayVisible) {
-      if (changes.overlayVisible.newValue) showOverlay();
-      else hideOverlay();
-    }
     if (changes.resumes || changes.activeResumeId) {
       if (root && root.getAttribute('data-jf-hidden') !== 'true') refreshResumeLabel();
     }
   });
 
-  // Build the overlay hidden, then hydrate visibility from the global state.
-  // Building first means we have a stable DOM target before the async storage
-  // read returns, so showOverlay can apply position and reveal in a single
-  // paint with no flicker.
+  // Build the overlay hidden; visibility is per-tab and only flips when the user
+  // clicks the toolbar icon (which fires a TOGGLE message to this tab).
   createOverlay();
-  if (isExtensionContextValid()) {
-    try {
-      chrome.storage.local.get(['overlayVisible'], (items) => {
-        if (chrome.runtime.lastError) return;
-        if (items && items.overlayVisible) showOverlay();
-      });
-    } catch (_) { /* context invalidated before hydration — ignore */ }
-  }
 })();

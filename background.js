@@ -274,14 +274,14 @@ async function handleLogJob(payload) {
   return { success: true, company, title, date, notes, updatedRange, requestedRange: range };
 }
 
-// Toolbar click flips a single global flag. Every tab's content script subscribes to
-// chrome.storage.onChanged for `overlayVisible` and shows or hides its overlay in
-// response, so the visibility state stays in sync across the whole browser.
-chrome.action.onClicked.addListener(() => {
-  chrome.storage.local.get(['overlayVisible'], (items) => {
-    if (chrome.runtime.lastError) return;
-    const next = !(items && items.overlayVisible);
-    chrome.storage.local.set({ overlayVisible: next });
+// Toolbar click toggles the overlay only on the active tab.
+chrome.action.onClicked.addListener((tab) => {
+  if (!tab?.id) return;
+  chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE' }, () => {
+    if (chrome.runtime.lastError) {
+      // Content script is not loaded on this tab (e.g. chrome:// pages, the Chrome Web Store).
+      void chrome.runtime.lastError;
+    }
   });
 });
 

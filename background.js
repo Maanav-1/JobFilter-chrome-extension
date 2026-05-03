@@ -1,5 +1,6 @@
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash-lite';
+const geminiEndpoint = (model) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
 const CHECK_JD_SYSTEM = `You are an expert technical recruiter evaluating a job description against a candidate's resume.
 CANDIDATE PROFILE: The candidate is an international student on an F-1 Visa (requires CPT/OPT/H1-B).
@@ -35,8 +36,8 @@ function extractJsonObject(text) {
   return stripped;
 }
 
-async function callGemini(apiKey, systemInstruction, userText) {
-  const url = `${GEMINI_ENDPOINT}?key=${encodeURIComponent(apiKey)}`;
+async function callGemini(apiKey, model, systemInstruction, userText) {
+  const url = `${geminiEndpoint(model)}?key=${encodeURIComponent(apiKey)}`;
   const body = {
     system_instruction: { parts: [{ text: systemInstruction }] },
     contents: [{ role: 'user', parts: [{ text: userText }] }]
@@ -56,11 +57,11 @@ async function callGemini(apiKey, systemInstruction, userText) {
   return text;
 }
 
-async function callGeminiJsonWithRetry(apiKey, systemInstruction, userText) {
+async function callGeminiJsonWithRetry(apiKey, model, systemInstruction, userText) {
   for (let attempt = 0; attempt < 2; attempt++) {
     let raw;
     try {
-      raw = await callGemini(apiKey, systemInstruction, userText);
+      raw = await callGemini(apiKey, model, systemInstruction, userText);
     } catch (e) {
       if (attempt === 1) throw e;
       continue;
@@ -103,8 +104,8 @@ function todayMMDDYYYY() {
 }
 
 async function handleCheckJd(payload) {
-  const { geminiApiKey, activeResumeId, resumes } = await getStorage([
-    'geminiApiKey', 'activeResumeId', 'resumes'
+  const { geminiApiKey, geminiModel, activeResumeId, resumes } = await getStorage([
+    'geminiApiKey', 'geminiModel', 'activeResumeId', 'resumes'
   ]);
   if (!geminiApiKey) {
     return { success: false, error: 'Set your API key in Options (right-click extension icon → Options)' };
@@ -116,10 +117,11 @@ async function handleCheckJd(payload) {
   if (!active || !active.parsedText) {
     return { success: false, error: 'No active resume selected. Open the overlay menu or Options to pick one.' };
   }
+  const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
   const jdText = (payload.text || '').slice(0, 12000);
   const userMsg = `Here is my active resume:\n${active.parsedText}\n\nHere is the Job Description:\n${jdText}`;
   try {
-    const parsed = await callGeminiJsonWithRetry(geminiApiKey, CHECK_JD_SYSTEM, userMsg);
+    const parsed = await callGeminiJsonWithRetry(geminiApiKey, model, CHECK_JD_SYSTEM, userMsg);
     return { success: true, ...parsed };
   } catch (e) {
     return { success: false, error: e.message || String(e) };
@@ -127,8 +129,8 @@ async function handleCheckJd(payload) {
 }
 
 async function handleLogJob(payload) {
-  const { geminiApiKey, sheetId, sheetTabName } = await getStorage([
-    'geminiApiKey', 'sheetId', 'sheetTabName'
+  const { geminiApiKey, geminiModel, sheetId, sheetTabName } = await getStorage([
+    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTabName'
   ]);
   if (!geminiApiKey) {
     return { success: false, error: 'Set your API key in Options (right-click extension icon → Options)' };
@@ -136,12 +138,13 @@ async function handleLogJob(payload) {
   if (!sheetId) {
     return { success: false, error: 'Set your Sheet ID in Options first' };
   }
+  const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
   const tabName = (sheetTabName || '').trim();
   const range = tabName ? `${tabName}!A:F` : 'A:F';
   const pageText = (payload.text || '').slice(0, 8000);
   let extracted;
   try {
-    extracted = await callGeminiJsonWithRetry(geminiApiKey, LOG_JOB_SYSTEM, pageText);
+    extracted = await callGeminiJsonWithRetry(geminiApiKey, model, LOG_JOB_SYSTEM, pageText);
   } catch (e) {
     return { success: false, error: e.message || String(e) };
   }

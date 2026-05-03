@@ -243,6 +243,8 @@ body {
   font-size: 12px;
   color: var(--muted);
 }
+.upload-status[hidden] { display: none; }
+.error-msg[hidden] { display: none; }
 
 .spinner {
   width: 14px;

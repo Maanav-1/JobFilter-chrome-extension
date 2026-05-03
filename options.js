@@ -1,7 +1,9 @@
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash-lite';
+const geminiEndpoint = (model) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
 const apiKeyInput = document.getElementById('geminiApiKey');
+const modelInput = document.getElementById('geminiModel');
 const sheetIdInput = document.getElementById('sheetId');
 const sheetTabNameInput = document.getElementById('sheetTabName');
 const saveBtn = document.getElementById('saveConfig');
@@ -38,19 +40,21 @@ function clearUploadError() {
 }
 
 async function loadConfig() {
-  const { geminiApiKey, sheetId, sheetTabName } = await getStorage([
-    'geminiApiKey', 'sheetId', 'sheetTabName'
+  const { geminiApiKey, geminiModel, sheetId, sheetTabName } = await getStorage([
+    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTabName'
   ]);
   if (geminiApiKey) apiKeyInput.value = geminiApiKey;
+  if (geminiModel) modelInput.value = geminiModel;
   if (sheetId) sheetIdInput.value = sheetId;
   if (sheetTabName) sheetTabNameInput.value = sheetTabName;
 }
 
 saveBtn.addEventListener('click', async () => {
   const geminiApiKey = apiKeyInput.value.trim();
+  const geminiModel = modelInput.value.trim();
   const sheetId = sheetIdInput.value.trim();
   const sheetTabName = sheetTabNameInput.value.trim();
-  await setStorage({ geminiApiKey, sheetId, sheetTabName });
+  await setStorage({ geminiApiKey, geminiModel, sheetId, sheetTabName });
   showToast(configToast, 'Saved ✓', false);
 });
 
@@ -137,8 +141,8 @@ function readFileAsBase64(file) {
   });
 }
 
-async function parseResumeWithGemini(apiKey, base64) {
-  const url = `${GEMINI_ENDPOINT}?key=${encodeURIComponent(apiKey)}`;
+async function parseResumeWithGemini(apiKey, model, base64) {
+  const url = `${geminiEndpoint(model)}?key=${encodeURIComponent(apiKey)}`;
   const body = {
     contents: [{
       parts: [
@@ -176,11 +180,12 @@ async function handleFile(file) {
     showUploadError('Only PDF files are supported.');
     return;
   }
-  const { geminiApiKey } = await getStorage(['geminiApiKey']);
+  const { geminiApiKey, geminiModel } = await getStorage(['geminiApiKey', 'geminiModel']);
   if (!geminiApiKey) {
     showUploadError('Set your Gemini API key above and click Save first.');
     return;
   }
+  const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
 
   uploadStatus.hidden = false;
   uploadStatusText.textContent = `Parsing ${file.name}…`;
@@ -188,7 +193,7 @@ async function handleFile(file) {
 
   try {
     const base64 = await readFileAsBase64(file);
-    const parsedText = await parseResumeWithGemini(geminiApiKey, base64);
+    const parsedText = await parseResumeWithGemini(geminiApiKey, model, base64);
     const newResume = {
       id: crypto.randomUUID(),
       name: file.name,

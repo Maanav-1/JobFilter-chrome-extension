@@ -275,14 +275,35 @@ async function handleLogJob(payload) {
 }
 
 // Toolbar click toggles the overlay only on the active tab.
-chrome.action.onClicked.addListener((tab) => {
+//
+// Fast path: ping the content script with a TOGGLE message; if it answers, done.
+// Fallback: on heavy-React pages (e.g. job-boards.greenhouse.io) the page can stay
+// busy long enough that Chrome never fires document_idle, so the content script
+// never auto-injects. When the ping fails with "Receiving end does not exist",
+// we explicitly inject content.css + content.js via chrome.scripting and then
+// retry TOGGLE. Restricted pages (chrome://, Web Store, view-source:) reject
+// both paths — we swallow the error since there is nothing the user can do.
+chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
-  chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE' }, () => {
-    if (chrome.runtime.lastError) {
-      // Content script is not loaded on this tab (e.g. chrome:// pages, the Chrome Web Store).
-      void chrome.runtime.lastError;
-    }
-  });
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE' });
+    return;
+  } catch (_) {
+    // No receiver — fall through to explicit injection.
+  }
+  try {
+    await chrome.scripting.insertCSS({
+      target: { tabId: tab.id },
+      files: ['content.css']
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content.js']
+    });
+    await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE' });
+  } catch (_) {
+    // Restricted page; nothing more to do.
+  }
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

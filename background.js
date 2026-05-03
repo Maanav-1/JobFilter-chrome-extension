@@ -140,7 +140,12 @@ async function handleLogJob(payload) {
   }
   const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
   const tabName = (sheetTabName || '').trim();
-  const range = tabName ? `${tabName}!A:F` : 'A:F';
+  // If the user supplies their own A1 range (e.g. "2026!A1:F500"), use it verbatim;
+  // otherwise auto-append A:F to whatever bare tab name they gave.
+  let range;
+  if (!tabName) range = 'A:F';
+  else if (tabName.includes('!')) range = tabName;
+  else range = `${tabName}!A:F`;
   const pageText = (payload.text || '').slice(0, 8000);
   let extracted;
   try {

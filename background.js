@@ -103,6 +103,61 @@ function todayMMDDYYYY() {
   return `${mm}/${dd}/${yyyy}`;
 }
 
+function colIndexToA1(idx) {
+  let s = '';
+  let n = idx;
+  while (n >= 0) {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  }
+  return s;
+}
+
+function quoteSheetTitle(title) {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(title)
+    ? title
+    : `'${String(title).replace(/'/g, "''")}'`;
+}
+
+async function fetchSpreadsheetMeta(token, sheetId) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}?fields=sheets(properties(title),tables)`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    let msg = `Sheets metadata fetch failed (${res.status})`;
+    try {
+      const j = JSON.parse(errBody);
+      if (j?.error?.message) msg = j.error.message;
+    } catch (_) { /* ignore */ }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+function findTableRange(meta, tableName) {
+  const target = String(tableName).trim().toLowerCase();
+  const tablesSeen = [];
+  for (const sheet of (meta?.sheets || [])) {
+    const sheetTitle = sheet?.properties?.title || '';
+    for (const t of (sheet?.tables || [])) {
+      const tName = t?.name || t?.displayName || '';
+      if (tName) tablesSeen.push(tName);
+      if (tName.toLowerCase() === target) {
+        const r = t?.range || {};
+        const sCol = r.startColumnIndex ?? 0;
+        const eCol = (r.endColumnIndex ?? (sCol + 1)) - 1;
+        const sRow = (r.startRowIndex ?? 0) + 1;
+        const eRow = r.endRowIndex ?? sRow;
+        return {
+          range: `${quoteSheetTitle(sheetTitle)}!${colIndexToA1(sCol)}${sRow}:${colIndexToA1(eCol)}${eRow}`,
+          tablesSeen
+        };
+      }
+    }
+  }
+  return { range: null, tablesSeen };
+}
+
 async function handleCheckJd(payload) {
   const { geminiApiKey, geminiModel, activeResumeId, resumes } = await getStorage([
     'geminiApiKey', 'geminiModel', 'activeResumeId', 'resumes'
@@ -140,10 +195,6 @@ async function handleLogJob(payload) {
   }
   const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
   const tableName = (sheetTableName || '').trim();
-  // Sheets values:append accepts a named-Table reference as the range,
-  // e.g. "Table3" → appends inside that table's bounds. If left blank,
-  // fall back to the first tab's columns A:F.
-  const range = tableName || 'A:F';
   const pageText = (payload.text || '').slice(0, 8000);
   let extracted;
   try {
@@ -164,7 +215,27 @@ async function handleLogJob(payload) {
     return { success: false, error: `Google sign-in failed: ${e.message}` };
   }
 
-  const sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`;
+  // Resolve a Sheets-native Table name (e.g. "Table3") to its current A1 range.
+  // values:append cannot reference a Table by name; it parses ranges as A1 only.
+  let range = 'A:F';
+  if (tableName) {
+    let meta;
+    try {
+      meta = await fetchSpreadsheetMeta(token, sheetId);
+    } catch (e) {
+      return { success: false, error: `Could not read spreadsheet metadata: ${e.message}` };
+    }
+    const lookup = findTableRange(meta, tableName);
+    if (!lookup.range) {
+      const list = lookup.tablesSeen.length
+        ? ` Found tables: ${lookup.tablesSeen.join(', ')}.`
+        : ' This spreadsheet has no named Tables. (Sheets → select your table → click the table icon to name it.)';
+      return { success: false, error: `Table "${tableName}" not found.${list}` };
+    }
+    range = lookup.range;
+  }
+
+  const sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   const res = await fetch(sheetUrl, {
     method: 'POST',
     headers: {

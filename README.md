@@ -13,7 +13,7 @@ No build step. Plain HTML / CSS / vanilla JS. No external runtime dependencies.
 
 ## Features
 
-- Floating overlay on every page; draggable, position persisted; visibility is a global flag synced across all tabs.
+- Floating overlay on every page; draggable, position persisted. Visibility is per-tab — clicking the toolbar icon toggles the overlay on the active tab only.
 - Site-aware DOM scraping for LinkedIn, Workday, Greenhouse, Lever, Symplicity, with a generic fallback — only the job posting body is sent to the model, not nav/footer/related jobs.
 - Resume manager: drag-and-drop PDF upload, parsed via Gemini's `inline_data` PDF input, multiple resumes supported with one active at a time. The active resume can be switched directly from the overlay.
 - Sheets append targets a named Sheets-native Table by name. Resolves the table to its current A1 range via the Spreadsheet metadata API and uses `insertDataOption=INSERT_ROWS` so the row joins the table cleanly via auto-extension.
@@ -89,7 +89,7 @@ chrome-extension/
 
 ## Usage
 
-- Click the toolbar icon to toggle the overlay across all tabs (visibility is a global flag).
+- Click the toolbar icon to toggle the overlay on the active tab. Visibility is local to each tab — opening it on one tab does not show it on others.
 - Drag from the 6-dot handle to reposition; the position is saved.
 - Click the resume label at the bottom of the overlay to switch which resume is active.
 
@@ -129,8 +129,7 @@ Everything lives in `chrome.storage.local`:
     { id, name, parsedText, uploadDate, charCount }
   ],
   activeResumeId: "string",
-  overlayPosition: { x, y } | null,
-  overlayVisible: boolean
+  overlayPosition: { x, y } | null
 }
 ```
 
@@ -141,7 +140,7 @@ Everything lives in `chrome.storage.local`:
 - **No build step.** Plain MV3 — the folder loads directly via `chrome://extensions → Load unpacked`.
 - **Service worker** (`background.js`) handles every external API call. Gemini uses an API key in the URL; Sheets uses an OAuth bearer token from `chrome.identity.getAuthToken`.
 - **Content script** (`content.js`) is a single IIFE with a `window.__jfOverlayInjected` guard — safe to be loaded once per page even on SPA route changes. All `chrome.*` calls are wrapped to handle the "extension context invalidated" case after a developer reload.
-- **Overlay visibility is a global flag** (`overlayVisible` in storage). Toolbar click flips it from `background.js`; every content script subscribes via `chrome.storage.onChanged` and shows/hides accordingly. No per-tab message passing.
+- **Overlay visibility is per-tab.** A toolbar click sends `{ type: 'TOGGLE' }` to the active tab via `chrome.tabs.sendMessage`; the content script flips its local DOM state. `chrome.runtime.lastError` is swallowed for tabs without a content script (chrome://, the Web Store, etc.). No global visibility flag in storage.
 - **JD scraping** uses a hostname-keyed selector waterfall (LinkedIn → Workday → Greenhouse → Lever → Symplicity → generic `main` / `[role=main]` → fallback to `document.body.innerText`). Trims to 12 KB for Check JD, 8 KB for Log Job before going to Gemini.
 - **Sheets append** runs in parallel with Gemini extraction via `Promise.all`. The named-Table lookup converts the table's `GridRange` to A1 notation so `values:append` can target it (the values endpoint does not understand raw Table names — only A1 ranges and named ranges).
 

@@ -78,6 +78,13 @@ body {
   font-weight: 600;
   letter-spacing: 0.2px;
 }
+.field-hint {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+  opacity: 0.8;
+  margin-left: 4px;
+}
 .field input {
   appearance: none;
   background: var(--card);

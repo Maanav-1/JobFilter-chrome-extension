@@ -127,13 +127,17 @@ async function handleCheckJd(payload) {
 }
 
 async function handleLogJob(payload) {
-  const { geminiApiKey, sheetId } = await getStorage(['geminiApiKey', 'sheetId']);
+  const { geminiApiKey, sheetId, sheetTabName } = await getStorage([
+    'geminiApiKey', 'sheetId', 'sheetTabName'
+  ]);
   if (!geminiApiKey) {
     return { success: false, error: 'Set your API key in Options (right-click extension icon → Options)' };
   }
   if (!sheetId) {
     return { success: false, error: 'Set your Sheet ID in Options first' };
   }
+  const tabName = (sheetTabName || '').trim();
+  const range = tabName ? `${tabName}!A:F` : 'A:F';
   const pageText = (payload.text || '').slice(0, 8000);
   let extracted;
   try {
@@ -154,7 +158,7 @@ async function handleLogJob(payload) {
     return { success: false, error: `Google sign-in failed: ${e.message}` };
   }
 
-  const sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/A:F:append?valueInputOption=USER_ENTERED`;
+  const sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`;
   const res = await fetch(sheetUrl, {
     method: 'POST',
     headers: {

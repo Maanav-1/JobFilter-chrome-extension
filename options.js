@@ -3,6 +3,7 @@ const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models
 
 const apiKeyInput = document.getElementById('geminiApiKey');
 const sheetIdInput = document.getElementById('sheetId');
+const sheetTabNameInput = document.getElementById('sheetTabName');
 const saveBtn = document.getElementById('saveConfig');
 const configToast = document.getElementById('configToast');
 
@@ -37,15 +38,19 @@ function clearUploadError() {
 }
 
 async function loadConfig() {
-  const { geminiApiKey, sheetId } = await getStorage(['geminiApiKey', 'sheetId']);
+  const { geminiApiKey, sheetId, sheetTabName } = await getStorage([
+    'geminiApiKey', 'sheetId', 'sheetTabName'
+  ]);
   if (geminiApiKey) apiKeyInput.value = geminiApiKey;
   if (sheetId) sheetIdInput.value = sheetId;
+  if (sheetTabName) sheetTabNameInput.value = sheetTabName;
 }
 
 saveBtn.addEventListener('click', async () => {
   const geminiApiKey = apiKeyInput.value.trim();
   const sheetId = sheetIdInput.value.trim();
-  await setStorage({ geminiApiKey, sheetId });
+  const sheetTabName = sheetTabNameInput.value.trim();
+  await setStorage({ geminiApiKey, sheetId, sheetTabName });
   showToast(configToast, 'Saved ✓', false);
 });
 

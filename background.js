@@ -129,8 +129,8 @@ async function handleCheckJd(payload) {
 }
 
 async function handleLogJob(payload) {
-  const { geminiApiKey, geminiModel, sheetId, sheetTabName } = await getStorage([
-    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTabName'
+  const { geminiApiKey, geminiModel, sheetId, sheetTableName } = await getStorage([
+    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTableName'
   ]);
   if (!geminiApiKey) {
     return { success: false, error: 'Set your API key in Options (right-click extension icon → Options)' };
@@ -139,13 +139,11 @@ async function handleLogJob(payload) {
     return { success: false, error: 'Set your Sheet ID in Options first' };
   }
   const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
-  const tabName = (sheetTabName || '').trim();
-  // If the user supplies their own A1 range (e.g. "2026!A1:F500"), use it verbatim;
-  // otherwise auto-append A:F to whatever bare tab name they gave.
-  let range;
-  if (!tabName) range = 'A:F';
-  else if (tabName.includes('!')) range = tabName;
-  else range = `${tabName}!A:F`;
+  const tableName = (sheetTableName || '').trim();
+  // Sheets values:append accepts a named-Table reference as the range,
+  // e.g. "Table3" → appends inside that table's bounds. If left blank,
+  // fall back to the first tab's columns A:F.
+  const range = tableName || 'A:F';
   const pageText = (payload.text || '').slice(0, 8000);
   let extracted;
   try {

@@ -5,7 +5,7 @@ const geminiEndpoint = (model) =>
 const apiKeyInput = document.getElementById('geminiApiKey');
 const modelInput = document.getElementById('geminiModel');
 const sheetIdInput = document.getElementById('sheetId');
-const sheetTabNameInput = document.getElementById('sheetTabName');
+const sheetTableNameInput = document.getElementById('sheetTableName');
 const saveBtn = document.getElementById('saveConfig');
 const configToast = document.getElementById('configToast');
 
@@ -40,21 +40,23 @@ function clearUploadError() {
 }
 
 async function loadConfig() {
-  const { geminiApiKey, geminiModel, sheetId, sheetTabName } = await getStorage([
-    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTabName'
+  const { geminiApiKey, geminiModel, sheetId, sheetTableName } = await getStorage([
+    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTableName'
   ]);
   if (geminiApiKey) apiKeyInput.value = geminiApiKey;
   if (geminiModel) modelInput.value = geminiModel;
   if (sheetId) sheetIdInput.value = sheetId;
-  if (sheetTabName) sheetTabNameInput.value = sheetTabName;
+  if (sheetTableName) sheetTableNameInput.value = sheetTableName;
 }
 
 saveBtn.addEventListener('click', async () => {
   const geminiApiKey = apiKeyInput.value.trim();
   const geminiModel = modelInput.value.trim();
   const sheetId = sheetIdInput.value.trim();
-  const sheetTabName = sheetTabNameInput.value.trim();
-  await setStorage({ geminiApiKey, geminiModel, sheetId, sheetTabName });
+  const sheetTableName = sheetTableNameInput.value.trim();
+  await setStorage({ geminiApiKey, geminiModel, sheetId, sheetTableName });
+  // Drop the obsolete sheetTabName key from a previous version so it can't shadow the new field.
+  chrome.storage.local.remove('sheetTabName');
   showToast(configToast, 'Saved ✓', false);
 });
 

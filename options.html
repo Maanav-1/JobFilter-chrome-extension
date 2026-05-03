@@ -28,8 +28,8 @@
         <input id="sheetId" type="text" autocomplete="off" placeholder="The long string between /d/ and /edit in your Sheet URL" />
       </label>
       <label class="field">
-        <span>Tab name <em class="field-hint">(blank = first tab; bare name = whole tab e.g. "2026"; or pass an explicit A1 range e.g. "2026!A1:F500" to clamp where append searches)</em></span>
-        <input id="sheetTabName" type="text" autocomplete="off" placeholder="2026  or  2026!A1:F500" />
+        <span>Table name <em class="field-hint">(name of a Sheets named Table, e.g. "Table3"; appends inside the table's bounds. Leave blank to fall back to first tab columns A:F)</em></span>
+        <input id="sheetTableName" type="text" autocomplete="off" placeholder="Table3" />
       </label>
       <div class="row-actions">
         <button id="saveConfig" class="btn primary" type="button">Save</button>

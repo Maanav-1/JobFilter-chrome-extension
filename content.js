@@ -12,6 +12,52 @@
   let resumeMenuEl = null;
   let logClearTimer = null;
   let dragState = null;
+  let pendingTimeoutId = null;
+
+  function isExtensionContextValid() {
+    try { return Boolean(chrome?.runtime?.id); } catch (_) { return false; }
+  }
+
+  function isContextInvalidatedError(msg) {
+    return typeof msg === 'string' && /Extension context invalidated|message port closed/i.test(msg);
+  }
+
+  function safeSendMessage(payload, onResponse) {
+    if (!isExtensionContextValid()) {
+      onResponse(null, new Error('Extension was reloaded — refresh this page to continue.'));
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage(payload, (resp) => {
+        const lastErr = chrome.runtime.lastError;
+        if (lastErr) {
+          const msg = isContextInvalidatedError(lastErr.message)
+            ? 'Extension was reloaded — refresh this page to continue.'
+            : (lastErr.message || 'Extension messaging failed.');
+          onResponse(null, new Error(msg));
+          return;
+        }
+        onResponse(resp, null);
+      });
+    } catch (e) {
+      const msg = isContextInvalidatedError(e?.message)
+        ? 'Extension was reloaded — refresh this page to continue.'
+        : (e?.message || 'Extension messaging failed.');
+      onResponse(null, new Error(msg));
+    }
+  }
+
+  function clearPendingTimeout() {
+    if (pendingTimeoutId) { clearTimeout(pendingTimeoutId); pendingTimeoutId = null; }
+  }
+
+  function startPendingTimeout(seconds) {
+    clearPendingTimeout();
+    pendingTimeoutId = setTimeout(() => {
+      pendingTimeoutId = null;
+      setError(`No response after ${seconds}s. The background worker may have stalled — try again, and if it persists check the extension service worker logs.`);
+    }, seconds * 1000);
+  }
 
   function $(sel, parent) { return (parent || root).querySelector(sel); }
 
@@ -127,7 +173,10 @@
     dragState = null;
     const x = parseInt(root.style.left, 10) || 0;
     const y = parseInt(root.style.top, 10) || 0;
-    chrome.storage.local.set({ overlayPosition: { x, y } });
+    if (!isExtensionContextValid()) return;
+    try {
+      chrome.storage.local.set({ overlayPosition: { x, y } });
+    } catch (_) { /* context invalidated mid-drag — silently drop */ }
   }
 
   function setLoading(message) {
@@ -142,6 +191,7 @@
   }
 
   function setError(message) {
+    clearPendingTimeout();
     if (logClearTimer) { clearTimeout(logClearTimer); logClearTimer = null; }
     resultEl.removeAttribute('data-empty');
     resultEl.innerHTML = `
@@ -191,19 +241,20 @@
     }[c]));
   }
 
+  function getPageText(maxChars) {
+    const raw = (document.body && document.body.innerText) || '';
+    return raw.length > maxChars ? raw.slice(0, maxChars) : raw;
+  }
+
   function onCheckClick() {
     setLoading('Checking JD…');
-    chrome.runtime.sendMessage(
-      { type: 'CHECK_JD', text: document.body.innerText, url: window.location.href },
-      (resp) => {
-        if (chrome.runtime.lastError) {
-          setError(chrome.runtime.lastError.message || 'Extension messaging failed.');
-          return;
-        }
-        if (!resp || !resp.success) {
-          setError(resp?.error || 'Unknown error.');
-          return;
-        }
+    startPendingTimeout(60);
+    safeSendMessage(
+      { type: 'CHECK_JD', text: getPageText(20000), url: window.location.href },
+      (resp, err) => {
+        clearPendingTimeout();
+        if (err) { setError(err.message); return; }
+        if (!resp || !resp.success) { setError(resp?.error || 'Unknown error.'); return; }
         setDecision(resp);
       }
     );
@@ -211,17 +262,13 @@
 
   function onLogClick() {
     setLoading('Logging job…');
-    chrome.runtime.sendMessage(
-      { type: 'LOG_JOB', text: document.body.innerText, url: window.location.href },
-      (resp) => {
-        if (chrome.runtime.lastError) {
-          setError(chrome.runtime.lastError.message || 'Extension messaging failed.');
-          return;
-        }
-        if (!resp || !resp.success) {
-          setError(resp?.error || 'Unknown error.');
-          return;
-        }
+    startPendingTimeout(120);
+    safeSendMessage(
+      { type: 'LOG_JOB', text: getPageText(15000), url: window.location.href },
+      (resp, err) => {
+        clearPendingTimeout();
+        if (err) { setError(err.message); return; }
+        if (!resp || !resp.success) { setError(resp?.error || 'Unknown error.'); return; }
         setLogged(resp);
       }
     );

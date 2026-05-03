@@ -243,9 +243,38 @@
     }[c]));
   }
 
+  // Site-specific selectors keep the JD payload tight: we ship just the posting body
+  // to the model instead of nav, footer, related jobs, etc.
+  const SITE_SELECTORS = [
+    ['linkedin.com',     '#job-details, .jobs-description__content'],
+    ['symplicity.com',   '.content-container-inner'],
+    ['workday',          '[data-automation-id="jobPostingDescription"]'],
+    ['myworkdayjobs',    '[data-automation-id="jobPostingDescription"]'],
+    ['greenhouse.io',    '#content'],
+    ['jobs.lever.co',    '.posting-page, .section-wrapper']
+  ];
+  const GENERIC_SELECTOR = 'main, [role="main"], #main-content, .job-description, .posting-body';
+
+  function readSelectorText(selector) {
+    try {
+      const node = document.querySelector(selector);
+      if (!node) return '';
+      return (node.innerText || '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
   function getPageText(maxChars) {
-    const raw = (document.body && document.body.innerText) || '';
-    return raw.length > maxChars ? raw.slice(0, maxChars) : raw;
+    const host = (window.location.hostname || '').toLowerCase();
+    const siteSelector = (SITE_SELECTORS.find(([needle]) => host.includes(needle)) || [])[1];
+
+    let text = '';
+    if (siteSelector) text = readSelectorText(siteSelector);
+    if (!text) text = readSelectorText(GENERIC_SELECTOR);
+    if (!text) text = ((document.body && document.body.innerText) || '').trim();
+
+    return text.length > maxChars ? text.slice(0, maxChars) : text;
   }
 
   function onCheckClick() {

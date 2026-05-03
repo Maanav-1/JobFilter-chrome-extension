@@ -8,8 +8,9 @@ HARD SKIP CONDITIONS (Output "Skip" immediately if ANY are met):
 1. VISA/CLEARANCE: JD requires US Citizenship, Security Clearance, or mentions ITAR / Export Control.
 2. SPONSORSHIP: JD explicitly states "no sponsorship provided", "does not sponsor F-1/OPT/CPT", or "must be authorized to work in the US without future sponsorship".
 3. EXPERIENCE LEVEL: JD is clearly for a Mid-Senior level role requiring 3+ years of full-time, post-grad industry experience.
+4. COMPENSATION: JD explicitly states the role is "unpaid", a "volunteer" position, or strictly "for academic credit" only.
 TECH STACK MATCH (Output "Skip" if):
-4. There is a severe mismatch between the core technologies required in the JD and the candidate's resume.
+5. There is a severe mismatch between the core technologies required in the JD and the candidate's resume.
 If the JD is entry-level/internship, does not restrict F-1 visas, and has reasonable tech stack overlap, output "Apply".
 OUTPUT FORMAT: Respond ONLY with a valid JSON object. No markdown or backticks.
 {"decision": "Apply" | "Skip", "reason": "One short sentence explaining why, max 15 words."}`;
@@ -196,44 +197,54 @@ async function handleLogJob(payload) {
   const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
   const tableName = (sheetTableName || '').trim();
   const pageText = (payload.text || '').slice(0, 8000);
+
+  // Run Gemini extraction concurrently with Sheets context setup (auth → metadata → range).
+  // Both legs are independent; the final values:append needs results from both, so we
+  // gate on Promise.all.
+  const geminiPromise = callGeminiJsonWithRetry(geminiApiKey, model, LOG_JOB_SYSTEM, pageText)
+    .catch((e) => { throw new Error(`Job extraction failed: ${e.message || e}`); });
+
+  const sheetsContextPromise = (async () => {
+    let token;
+    try {
+      token = await getAuthToken(true);
+    } catch (e) {
+      throw new Error(`Google sign-in failed: ${e.message || e}`);
+    }
+    let range = 'A:F';
+    if (tableName) {
+      let meta;
+      try {
+        meta = await fetchSpreadsheetMeta(token, sheetId);
+      } catch (e) {
+        throw new Error(`Could not read spreadsheet metadata: ${e.message || e}`);
+      }
+      const lookup = findTableRange(meta, tableName);
+      if (!lookup.range) {
+        const list = lookup.tablesSeen.length
+          ? ` Found tables: ${lookup.tablesSeen.join(', ')}.`
+          : ' This spreadsheet has no named Tables. (Sheets → select your table → click the table icon to name it.)';
+        throw new Error(`Table "${tableName}" not found.${list}`);
+      }
+      range = lookup.range;
+    }
+    return { token, range };
+  })();
+
   let extracted;
+  let sheetsContext;
   try {
-    extracted = await callGeminiJsonWithRetry(geminiApiKey, model, LOG_JOB_SYSTEM, pageText);
+    [extracted, sheetsContext] = await Promise.all([geminiPromise, sheetsContextPromise]);
   } catch (e) {
     return { success: false, error: e.message || String(e) };
   }
+  const { token, range } = sheetsContext;
+
   const company = String(extracted.company || '').trim();
   const title = String(extracted.title || '').trim();
   const notes = String(extracted.notes || '').trim();
   const date = todayMMDDYYYY();
   const url = payload.url || '';
-
-  let token;
-  try {
-    token = await getAuthToken(true);
-  } catch (e) {
-    return { success: false, error: `Google sign-in failed: ${e.message}` };
-  }
-
-  // Resolve a Sheets-native Table name (e.g. "Table3") to its current A1 range.
-  // values:append cannot reference a Table by name; it parses ranges as A1 only.
-  let range = 'A:F';
-  if (tableName) {
-    let meta;
-    try {
-      meta = await fetchSpreadsheetMeta(token, sheetId);
-    } catch (e) {
-      return { success: false, error: `Could not read spreadsheet metadata: ${e.message}` };
-    }
-    const lookup = findTableRange(meta, tableName);
-    if (!lookup.range) {
-      const list = lookup.tablesSeen.length
-        ? ` Found tables: ${lookup.tablesSeen.join(', ')}.`
-        : ' This spreadsheet has no named Tables. (Sheets → select your table → click the table icon to name it.)';
-      return { success: false, error: `Table "${tableName}" not found.${list}` };
-    }
-    range = lookup.range;
-  }
 
   const sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   const res = await fetch(sheetUrl, {

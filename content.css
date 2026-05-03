@@ -1,0 +1,295 @@
+#jf-overlay {
+  --jf-bg: #ffffff;
+  --jf-fg: #111827;
+  --jf-muted: #6b7280;
+  --jf-border: #1f2937;
+  --jf-soft-border: #e5e7eb;
+  --jf-primary: #16a34a;
+  --jf-primary-hover: #15803d;
+  --jf-danger: #dc2626;
+  --jf-danger-bg: #fef2f2;
+  --jf-success-bg: #f0fdf4;
+  --jf-skip-bg: #fef2f2;
+  --jf-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 240px;
+  z-index: 999999;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--jf-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  #jf-overlay {
+    --jf-bg: #0f172a;
+    --jf-fg: #f1f5f9;
+    --jf-muted: #94a3b8;
+    --jf-border: #334155;
+    --jf-soft-border: #1e293b;
+    --jf-primary: #22c55e;
+    --jf-primary-hover: #16a34a;
+    --jf-danger: #f87171;
+    --jf-danger-bg: rgba(248, 113, 113, 0.12);
+    --jf-success-bg: rgba(34, 197, 94, 0.12);
+    --jf-skip-bg: rgba(248, 113, 113, 0.12);
+  }
+}
+
+#jf-overlay[data-jf-hidden="true"] { display: none !important; }
+
+#jf-overlay .jf-card {
+  background: var(--jf-bg);
+  border: 1px solid var(--jf-border);
+  border-radius: 12px;
+  box-shadow: var(--jf-shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#jf-overlay .jf-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--jf-soft-border);
+  background: var(--jf-bg);
+  user-select: none;
+}
+
+#jf-overlay .jf-drag {
+  display: grid;
+  grid-template-columns: repeat(2, 4px);
+  grid-auto-rows: 4px;
+  gap: 2px;
+  cursor: grab;
+  padding: 2px;
+}
+#jf-overlay .jf-drag:active { cursor: grabbing; }
+#jf-overlay .jf-drag span {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--jf-muted);
+}
+
+#jf-overlay .jf-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  color: var(--jf-fg);
+}
+
+#jf-overlay .jf-close {
+  background: transparent;
+  border: none;
+  color: var(--jf-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+#jf-overlay .jf-close:hover {
+  color: var(--jf-fg);
+  background: var(--jf-soft-border);
+}
+
+#jf-overlay .jf-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#jf-overlay .jf-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+#jf-overlay .jf-btn-primary {
+  background: var(--jf-primary);
+  color: #ffffff;
+  border-color: var(--jf-primary);
+}
+#jf-overlay .jf-btn-primary:hover { background: var(--jf-primary-hover); border-color: var(--jf-primary-hover); }
+
+#jf-overlay .jf-btn-outline {
+  background: transparent;
+  color: var(--jf-fg);
+  border-color: var(--jf-border);
+}
+#jf-overlay .jf-btn-outline:hover { background: var(--jf-soft-border); }
+
+#jf-overlay .jf-result[data-empty="true"] { display: none; }
+#jf-overlay .jf-result {
+  margin-top: 2px;
+}
+
+#jf-overlay .jf-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--jf-soft-border);
+  border-radius: 8px;
+  color: var(--jf-muted);
+  font-size: 12px;
+}
+
+#jf-overlay .jf-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--jf-soft-border);
+  border-top-color: var(--jf-fg);
+  animation: jf-spin 0.8s linear infinite;
+  display: inline-block;
+}
+@keyframes jf-spin { to { transform: rotate(360deg); } }
+
+#jf-overlay .jf-card-result {
+  border: 1px solid var(--jf-soft-border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#jf-overlay .jf-apply { background: var(--jf-success-bg); border-color: var(--jf-primary); }
+#jf-overlay .jf-skip { background: var(--jf-skip-bg); border-color: var(--jf-danger); }
+#jf-overlay .jf-error { background: var(--jf-danger-bg); border-color: var(--jf-danger); }
+#jf-overlay .jf-logged { background: var(--jf-success-bg); border-color: var(--jf-primary); }
+
+#jf-overlay .jf-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--jf-fg);
+}
+#jf-overlay .jf-apply .jf-badge { background: var(--jf-primary); color: #ffffff; }
+#jf-overlay .jf-skip .jf-badge { background: var(--jf-danger); color: #ffffff; }
+#jf-overlay .jf-badge-error { background: var(--jf-danger); color: #ffffff; }
+
+#jf-overlay .jf-reason { font-size: 12px; color: var(--jf-fg); }
+
+#jf-overlay .jf-logged-head {
+  font-weight: 700;
+  color: var(--jf-fg);
+  font-size: 13px;
+}
+
+#jf-overlay .jf-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--jf-muted);
+}
+#jf-overlay .jf-kv strong {
+  color: var(--jf-fg);
+  font-weight: 600;
+  text-align: right;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#jf-overlay .jf-resume-row {
+  position: relative;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--jf-soft-border);
+}
+
+#jf-overlay .jf-resume-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 4px 2px;
+  font-size: 11px;
+  color: var(--jf-muted);
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: 4px;
+}
+#jf-overlay .jf-resume-label:hover { color: var(--jf-fg); }
+#jf-overlay .jf-resume-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 90%;
+  text-align: left;
+}
+#jf-overlay .jf-caret { font-size: 10px; opacity: 0.7; }
+
+#jf-overlay .jf-resume-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
+  background: var(--jf-bg);
+  border: 1px solid var(--jf-border);
+  border-radius: 8px;
+  box-shadow: var(--jf-shadow);
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 1;
+  padding: 4px;
+}
+
+#jf-overlay .jf-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--jf-fg);
+  cursor: pointer;
+  font-family: inherit;
+}
+#jf-overlay .jf-menu-item:hover { background: var(--jf-soft-border); }
+#jf-overlay .jf-menu-item.is-active { color: var(--jf-primary); font-weight: 600; }
+#jf-overlay .jf-menu-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80%;
+}
+#jf-overlay .jf-menu-check { font-size: 10px; }
+#jf-overlay .jf-menu-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--jf-muted);
+  text-align: center;
+}

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JobFilter — Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="page-head">
+      <h1>JobFilter</h1>
+      <p class="subtitle">Settings &amp; resume manager</p>
+    </header>
+
+    <section class="card">
+      <h2>API configuration</h2>
+      <label class="field">
+        <span>Gemini API key</span>
+        <input id="geminiApiKey" type="password" autocomplete="off" placeholder="AIza..." />
+      </label>
+      <label class="field">
+        <span>Google Sheet ID</span>
+        <input id="sheetId" type="text" autocomplete="off" placeholder="The long string between /d/ and /edit in your Sheet URL" />
+      </label>
+      <div class="row-actions">
+        <button id="saveConfig" class="btn primary" type="button">Save</button>
+        <span id="configToast" class="toast" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Resumes</h2>
+      <div id="resumeList" class="resume-list" aria-live="polite"></div>
+
+      <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Upload PDF resume">
+        <input id="fileInput" type="file" accept="application/pdf" hidden />
+        <div class="drop-inner">
+          <div class="drop-title">Drop PDF here or click to upload</div>
+          <div class="drop-sub">PDF only. Parsed with Gemini for job-screening context.</div>
+        </div>
+        <div id="uploadStatus" class="upload-status" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="upload-status-text">Parsing resume…</span>
+        </div>
+      </div>
+      <div id="uploadError" class="error-msg" hidden></div>
+    </section>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>

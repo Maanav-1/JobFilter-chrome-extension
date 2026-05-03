@@ -181,7 +181,12 @@ async function handleLogJob(payload) {
     }
     return { success: false, error: msg };
   }
-  return { success: true, company, title, date, notes };
+  let updatedRange = '';
+  try {
+    const j = await res.json();
+    updatedRange = j?.updates?.updatedRange || '';
+  } catch (_) { /* response body parse failure is non-fatal */ }
+  return { success: true, company, title, date, notes, updatedRange, requestedRange: range };
 }
 
 chrome.action.onClicked.addListener((tab) => {

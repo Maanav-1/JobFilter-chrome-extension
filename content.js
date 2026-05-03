@@ -218,6 +218,7 @@
 
   function setLogged(result) {
     resultEl.removeAttribute('data-empty');
+    const wroteTo = result.updatedRange || result.requestedRange || '—';
     resultEl.innerHTML = `
       <div class="jf-card-result jf-logged">
         <div class="jf-logged-head">Logged ✓</div>
@@ -225,6 +226,7 @@
         <div class="jf-kv"><span>Title</span><strong>${escapeHtml(result.title || '—')}</strong></div>
         <div class="jf-kv"><span>Date</span><strong>${escapeHtml(result.date || '—')}</strong></div>
         <div class="jf-kv"><span>Notes</span><strong>${escapeHtml(result.notes || '—')}</strong></div>
+        <div class="jf-kv"><span>Wrote to</span><strong>${escapeHtml(wroteTo)}</strong></div>
       </div>
     `;
     if (logClearTimer) clearTimeout(logClearTimer);
@@ -232,7 +234,7 @@
       resultEl.innerHTML = '';
       resultEl.setAttribute('data-empty', 'true');
       logClearTimer = null;
-    }, 5000);
+    }, 10000);
   }
 
   function escapeHtml(s) {

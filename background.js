@@ -278,11 +278,13 @@ async function handleLogJob(payload) {
 //
 // Fast path: ping the content script with a TOGGLE message; if it answers, done.
 // Fallback: on heavy-React pages (e.g. job-boards.greenhouse.io) the page can stay
-// busy long enough that Chrome never fires document_idle, so the content script
-// never auto-injects. When the ping fails with "Receiving end does not exist",
-// we explicitly inject content.css + content.js via chrome.scripting and then
-// retry TOGGLE. Restricted pages (chrome://, Web Store, view-source:) reject
-// both paths — we swallow the error since there is nothing the user can do.
+// main-thread-busy long enough that Chrome never fires document_idle, so the
+// content script never auto-injects. When the ping fails with "Receiving end
+// does not exist", we explicitly inject content.css + content.js via
+// chrome.scripting and retry TOGGLE. The injectImmediately flag is critical
+// here: without it, chrome.scripting.executeScript also defaults to
+// document_idle, which would stall on the same heuristic that prevented the
+// initial auto-injection.
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
   try {
@@ -298,11 +300,14 @@ chrome.action.onClicked.addListener(async (tab) => {
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      files: ['content.js']
+      files: ['content.js'],
+      injectImmediately: true
     });
     await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE' });
-  } catch (_) {
-    // Restricted page; nothing more to do.
+  } catch (e) {
+    // Restricted page (chrome://, Web Store, view-source:) or an injection
+    // error — surface it in the service-worker log so we can diagnose.
+    console.warn('[JobFilter] On-demand injection failed:', e?.message || e);
   }
 });
 

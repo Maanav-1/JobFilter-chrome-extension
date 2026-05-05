@@ -251,9 +251,10 @@
     ['workday',          '[data-automation-id="jobPostingDescription"]'],
     ['myworkdayjobs',    '[data-automation-id="jobPostingDescription"]'],
     ['greenhouse.io',    '#content'],
+    ['icims.com',        '.iCIMS_JobContent, .iCIMS_JobContainer'],
     ['jobs.lever.co',    '.posting-page, .section-wrapper']
   ];
-  const GENERIC_SELECTOR = 'main, [role="main"], #main-content, .job-description, .posting-body';
+  const GENERIC_SELECTOR = 'main, [role="main"], #main-content, .job-description, .posting-body, .iCIMS_JobContainer';
 
   function readSelectorText(selector) {
     try {
@@ -270,7 +271,23 @@
     const siteSelector = (SITE_SELECTORS.find(([needle]) => host.includes(needle)) || [])[1];
 
     let text = '';
-    if (siteSelector) text = readSelectorText(siteSelector);
+
+    // iCIMS portals (e.g. Uber, T-Mobile, many F500 careers sites) frequently embed the
+    // posting body inside <iframe id="icims_content_iframe">. When the parent and frame
+    // are same-origin we can reach into contentDocument directly; cross-origin frames
+    // throw on access and we fall through to the normal waterfall below.
+    try {
+      const icimsFrame = document.querySelector('iframe#icims_content_iframe');
+      if (icimsFrame && icimsFrame.contentDocument) {
+        const inner = icimsFrame.contentDocument.querySelector('.iCIMS_JobContent, .iCIMS_JobContainer, body');
+        const innerText = inner && inner.innerText;
+        if (innerText) text = innerText.trim();
+      }
+    } catch (_) {
+      // cross-origin iframe — nothing accessible, fall through
+    }
+
+    if (!text && siteSelector) text = readSelectorText(siteSelector);
     if (!text) text = readSelectorText(GENERIC_SELECTOR);
     if (!text) text = ((document.body && document.body.innerText) || '').trim();
 

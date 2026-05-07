@@ -142,14 +142,18 @@
 }
 
 #jf-overlay .jf-loading {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
+  margin: 0 !important;
+  position: static !important;
   border: 1px dashed var(--jf-soft-border);
   border-radius: 8px;
   color: var(--jf-muted);
   font-size: 12px;
+  line-height: 1.4 !important;
 }
 
 #jf-overlay .jf-spinner {
@@ -167,9 +171,14 @@
   border: 1px solid var(--jf-soft-border);
   border-radius: 8px;
   padding: 10px;
-  display: flex;
-  flex-direction: column;
+  /* !important on the layout primitives because some host pages ship aggressive
+     resets (* { display: block !important }, line-height: 0, position: absolute
+     on tag selectors, etc.) that flatten our flex stack and overlap badge + reason. */
+  display: flex !important;
+  flex-direction: column !important;
   gap: 6px;
+  margin: 0 !important;
+  position: static !important;
 }
 
 #jf-overlay .jf-apply { background: var(--jf-success-bg); border-color: var(--jf-primary); }
@@ -178,33 +187,61 @@
 #jf-overlay .jf-logged { background: var(--jf-success-bg); border-color: var(--jf-primary); }
 
 #jf-overlay .jf-badge {
-  display: inline-block;
+  display: inline-block !important;
+  position: static !important;
   align-self: flex-start;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.6px;
+  line-height: 1.4 !important;
   padding: 2px 6px;
+  margin: 0 !important;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.06);
   color: var(--jf-fg);
+  text-decoration: none !important;
+  text-transform: none !important;
+  transform: none !important;
 }
 #jf-overlay .jf-apply .jf-badge { background: var(--jf-primary); color: #ffffff; }
 #jf-overlay .jf-skip .jf-badge { background: var(--jf-danger); color: #ffffff; }
 #jf-overlay .jf-badge-error { background: var(--jf-danger); color: #ffffff; }
 
-#jf-overlay .jf-reason { font-size: 12px; color: var(--jf-fg); }
+#jf-overlay .jf-reason {
+  display: block !important;
+  position: static !important;
+  font-size: 12px;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+  color: var(--jf-fg);
+  text-decoration: none !important;
+  text-transform: none !important;
+  transform: none !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere;
+}
 
 #jf-overlay .jf-logged-head {
+  display: block !important;
+  position: static !important;
   font-weight: 700;
+  line-height: 1.4 !important;
+  margin: 0 !important;
   color: var(--jf-fg);
   font-size: 13px;
+  text-decoration: none !important;
 }
 
 #jf-overlay .jf-kv {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
   justify-content: space-between;
   gap: 8px;
+  margin: 0 !important;
+  position: static !important;
   font-size: 11px;
+  line-height: 1.4 !important;
   color: var(--jf-muted);
 }
 #jf-overlay .jf-kv strong {

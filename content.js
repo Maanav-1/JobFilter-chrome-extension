@@ -110,8 +110,29 @@
   function applyPosition(pos) {
     if (!root) return;
     if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
-      root.style.left = `${pos.x}px`;
-      root.style.top = `${pos.y}px`;
+      // Clamp to the current viewport. A saved position from a wider window
+      // (different monitor, devtools-closed layout, etc.) could otherwise land
+      // the overlay entirely off-screen and look like the toggle is dead.
+      // Overlay width is fixed at 240px in content.css; we keep at least 40px
+      // of it visible on each axis so the user can always grab and re-drag it.
+      const overlayW = 240;
+      const minVisible = 40;
+      const maxX = Math.max(0, window.innerWidth - minVisible);
+      const maxY = Math.max(0, window.innerHeight - minVisible);
+      const x = Math.max(0, Math.min(maxX, pos.x));
+      const y = Math.max(0, Math.min(maxY, pos.y));
+      // If clamping completely changed the requested position (saved pos is so
+      // far off the viewport we can't honour it sanely), fall back to default
+      // top-right instead of pinning to the viewport edge.
+      const drifted = Math.abs(x - pos.x) > overlayW || Math.abs(y - pos.y) > 200;
+      if (drifted) {
+        root.style.top = `${DEFAULT_TOP}px`;
+        root.style.right = `${DEFAULT_RIGHT}px`;
+        root.style.left = 'auto';
+        return;
+      }
+      root.style.left = `${x}px`;
+      root.style.top = `${y}px`;
       root.style.right = 'auto';
     } else {
       root.style.top = `${DEFAULT_TOP}px`;

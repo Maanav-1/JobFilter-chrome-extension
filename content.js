@@ -110,21 +110,22 @@
   function applyPosition(pos) {
     if (!root) return;
     if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
-      // Clamp to the current viewport. A saved position from a wider window
-      // (different monitor, devtools-closed layout, etc.) could otherwise land
-      // the overlay entirely off-screen and look like the toggle is dead.
-      // Overlay width is fixed at 240px in content.css; we keep at least 40px
-      // of it visible on each axis so the user can always grab and re-drag it.
+      // Clamp so the ENTIRE overlay fits inside the current viewport. The
+      // previous implementation only guaranteed ~40px visible, which on
+      // narrower windows (e.g. saved x=1081 on a wider monitor, current window
+      // 1080–1280) left users staring at a fingernail-thin sliver and thinking
+      // the extension never opened.
       const overlayW = 240;
-      const minVisible = 40;
-      const maxX = Math.max(0, window.innerWidth - minVisible);
-      const maxY = Math.max(0, window.innerHeight - minVisible);
+      const overlayH = 260; // conservative upper bound for card height
+      const maxX = Math.max(0, window.innerWidth - overlayW);
+      const maxY = Math.max(0, window.innerHeight - overlayH);
       const x = Math.max(0, Math.min(maxX, pos.x));
       const y = Math.max(0, Math.min(maxY, pos.y));
-      // If clamping completely changed the requested position (saved pos is so
-      // far off the viewport we can't honour it sanely), fall back to default
-      // top-right instead of pinning to the viewport edge.
-      const drifted = Math.abs(x - pos.x) > overlayW || Math.abs(y - pos.y) > 200;
+      // If clamping had to move the saved coords by more than half the overlay
+      // on either axis, the saved position is meaningfully off this viewport.
+      // Reset to default top-right instead of pinning to the edge — gives the
+      // user a familiar starting point.
+      const drifted = Math.abs(x - pos.x) > overlayW / 2 || Math.abs(y - pos.y) > overlayH / 2;
       if (drifted) {
         root.style.top = `${DEFAULT_TOP}px`;
         root.style.right = `${DEFAULT_RIGHT}px`;

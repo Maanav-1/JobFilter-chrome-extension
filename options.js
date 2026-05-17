@@ -149,7 +149,21 @@ async function parseResumeWithGemini(apiKey, model, base64) {
     contents: [{
       parts: [
         { inline_data: { mime_type: 'application/pdf', data: base64 } },
-        { text: 'Extract all relevant information from this resume for job matching: full name, skills, tech stack, education, visa/work authorization status, experience level, notable projects. Return as clean plain text, optimized for use as context in job screening prompts.' }
+        { text: `Extract this resume into a compact structured profile for job-fit screening. This profile is reused as context across many job-screening API calls, so optimize for token count — be concise, no filler words.
+
+Output plain text with these labeled sections, in this order. Omit a section entirely if it does not apply.
+
+NAME: full name
+EDUCATION: one line per degree, most recent first, format "Degree, School (GPA), Month Year – Month Year"
+LANGUAGES: programming languages, comma-separated
+FRAMEWORKS: frameworks and libraries, comma-separated
+DATABASES: databases, comma-separated
+CLOUD_TOOLS: cloud platforms and dev tools, comma-separated
+AI_ML: AI/ML tech — models, libraries, frameworks, vector DBs, comma-separated
+EXPERIENCE: 1-2 line summary of work history. If the resume has no work-experience section, write "No prior industry experience"
+PROJECTS: up to 4 lines, format "ProjectName — one-line description naming the key tech used"
+
+Return only the structured profile. No preamble, no markdown, no code fences, no commentary.` }
       ]
     }]
   };

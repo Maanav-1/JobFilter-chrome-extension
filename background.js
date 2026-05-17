@@ -2,17 +2,14 @@ const GEMINI_MODEL_DEFAULT = 'gemini-3.1-flash-lite';
 const geminiEndpoint = (model) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
-const CHECK_JD_SYSTEM = `You are an expert technical recruiter screening a job description for a specific candidate. Reason about fit the way an experienced engineering recruiter would — scan for blockers first, weigh actual technical overlap second, output one decision. Do not run a shallow keyword check.
+function buildCheckJdSystem(resumeProfile) {
+  return `You are an expert technical recruiter screening a job description for a specific candidate. Reason about fit the way an experienced engineering recruiter would — scan for blockers first, weigh actual technical overlap second, output one decision. Do not run a shallow keyword check.
 
 CANDIDATE PROFILE
-- MS in Computer Science, Northeastern University, expected May 2027 (GPA 3.917).
-- F-1 visa, currently CPT-eligible. CPT is a valid US work authorization issued by the school for internships and co-ops; it does NOT require any employer-sponsored petition. Generic "must be authorized to work in the US" is satisfied by CPT and is NOT a blocker. Treat work-authorization language as a blocker ONLY when the JD explicitly rules out F-1 / CPT / OPT or requires authorization "now and in the future without sponsorship" (see HARD SKIP 2).
-- No prior industry internship experience yet — actively looking for first internship / co-op.
-- Core software stack: Java, Spring Boot, Python, FastAPI, React, TypeScript, REST APIs, Redis, PostgreSQL, MySQL, MongoDB.
-- AI / ML stack: RAG pipelines, LangChain, Qdrant, Gemini embeddings, YOLOv8, MediaPipe.
-- Cloud / tooling: AWS, Azure, Git.
+${resumeProfile}
 
-The full parsed resume is also provided in the user message for fine-grained signal; the summary above is authoritative when they conflict.
+WORK AUTHORIZATION CONTEXT
+- F-1 visa, currently CPT-eligible. CPT is a valid US work authorization issued by the school for internships and co-ops; it does NOT require any employer-sponsored petition. Generic "must be authorized to work in the US" is satisfied by CPT and is NOT a blocker. Treat work-authorization language as a blocker ONLY when the JD explicitly rules out F-1 / CPT / OPT or requires authorization "now and in the future without sponsorship" (see HARD SKIP 2).
 
 HARD SKIP — output "Skip" immediately if ANY of these are present:
 1. CITIZENSHIP / CLEARANCE: requires US Citizenship, US Permanent Residency, Active Security Clearance, Public Trust, or mentions ITAR / Export Control restrictions.
@@ -39,6 +36,7 @@ REASONING & OUTPUT REQUIREMENTS
 OUTPUT FORMAT
 Respond with ONLY a single valid JSON object. No prose before or after. No markdown. No code fences. No backticks.
 {"decision": "Apply" | "Skip", "reason": "specific reason naming the blocker or fit, max 20 words"}`;
+}
 
 const LOG_JOB_SYSTEM = `Extract job details from this page. Respond ONLY with valid JSON, no markdown, no backticks:
 {"company": "string", "title": "string", "notes": "string (req ID if found, or internship term, or empty string)"}`;
@@ -200,9 +198,10 @@ async function handleCheckJd(payload) {
   }
   const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
   const jdText = (payload.text || '').slice(0, 12000);
-  const userMsg = `Here is my active resume:\n${active.parsedText}\n\nHere is the Job Description:\n${jdText}`;
+  const systemPrompt = buildCheckJdSystem(active.parsedText);
+  const userMsg = `Here is the Job Description:\n${jdText}`;
   try {
-    const parsed = await callGeminiJsonWithRetry(geminiApiKey, model, CHECK_JD_SYSTEM, userMsg);
+    const parsed = await callGeminiJsonWithRetry(geminiApiKey, model, systemPrompt, userMsg);
     return { success: true, ...parsed };
   } catch (e) {
     return { success: false, error: e.message || String(e) };

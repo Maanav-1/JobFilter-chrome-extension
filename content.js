@@ -402,9 +402,18 @@
     closeResumeMenu();
   }
 
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (!msg || !msg.type) return;
-    if (msg.type === 'TOGGLE') toggleOverlay();
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (!msg || !msg.type) return false;
+    if (msg.type === 'TOGGLE') {
+      toggleOverlay();
+      // Respond synchronously so the sender's awaited promise resolves with
+      // { ok: true } instead of rejecting on port-closed in MV3 — preventing
+      // background.js from interpreting "no response" as "no receiver" and
+      // re-injecting + sending a second TOGGLE that cancels the first.
+      try { sendResponse({ ok: true }); } catch (_) { /* sender already gone */ }
+      return false;
+    }
+    return false;
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {

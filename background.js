@@ -314,8 +314,20 @@ chrome.action.onClicked.addListener(async (tab) => {
   try {
     await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE' });
     return;
-  } catch (_) {
-    // No receiver — fall through to explicit injection.
+  } catch (e) {
+    // Only fall through to on-demand injection when the error is specifically
+    // "no receiver". Any other error (notably "The message port closed before
+    // a response was received") means the content script IS there and almost
+    // certainly already handled the TOGGLE — re-injecting and re-sending would
+    // fire a SECOND TOGGLE that cancels the first, making the overlay look
+    // like it never opened.
+    const msg = (e && e.message) || '';
+    const noReceiver = /Receiving end does not exist|Could not establish connection/i.test(msg);
+    if (!noReceiver) {
+      // Content script handled TOGGLE; we just didn't get a clean response.
+      // Nothing more to do — bail out without re-injecting.
+      return;
+    }
   }
   try {
     await chrome.scripting.insertCSS({

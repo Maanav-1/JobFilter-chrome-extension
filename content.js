@@ -61,8 +61,19 @@
 
   function $(sel, parent) { return (parent || root).querySelector(sel); }
 
+  // Returns a live, attached overlay. If the host page tore our node out of the
+  // DOM (SPA route change, React hydration-recovery re-render, an autofill
+  // extension rewriting the document, etc.) our `root` variable still points at
+  // a detached element — rebuild from scratch so the toggle keeps working
+  // without a full page reload.
+  function ensureOverlay() {
+    if (root && root.isConnected) return root;
+    root = null;
+    return createOverlay();
+  }
+
   function createOverlay() {
-    if (root) return root;
+    if (root && root.isConnected) return root;
     root = document.createElement('div');
     root.id = ROOT_ID;
     root.setAttribute('data-jf-hidden', 'true');
@@ -143,8 +154,9 @@
   }
 
   function showOverlay() {
-    if (!root) createOverlay();
+    ensureOverlay();
     chrome.storage.local.get(['overlayPosition'], (items) => {
+      ensureOverlay();
       applyPosition(items?.overlayPosition || null);
       root.removeAttribute('data-jf-hidden');
       refreshResumeLabel();
@@ -158,12 +170,11 @@
   }
 
   function toggleOverlay() {
-    if (!root) {
-      createOverlay();
-      showOverlay();
-      return;
-    }
-    if (root.getAttribute('data-jf-hidden') === 'true') showOverlay();
+    // ensureOverlay rebuilds if our node was detached by the host page, so a
+    // detached-but-non-null `root` can't make the toggle silently no-op.
+    const wasHidden = !root || !root.isConnected || root.getAttribute('data-jf-hidden') === 'true';
+    ensureOverlay();
+    if (wasHidden) showOverlay();
     else hideOverlay();
   }
 

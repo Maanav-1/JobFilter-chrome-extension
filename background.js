@@ -298,37 +298,32 @@ async function handleLogJob(payload) {
   return { success: true, company, title, date, notes, updatedRange, requestedRange: range };
 }
 
-// Toolbar click toggles the overlay only on the active tab.
+// Toolbar click toggles the overlay on the active tab.
 //
-// Fast path: ping the content script with a TOGGLE message; if it answers, done.
-// Fallback: on heavy-React pages (e.g. job-boards.greenhouse.io) the page can stay
-// main-thread-busy long enough that Chrome never fires document_idle, so the
-// content script never auto-injects. When the ping fails with "Receiving end
-// does not exist", we explicitly inject content.css + content.js via
-// chrome.scripting and retry TOGGLE. The injectImmediately flag is critical
-// here: without it, chrome.scripting.executeScript also defaults to
-// document_idle, which would stall on the same heuristic that prevented the
-// initial auto-injection.
+// Unified design: ALWAYS ensure the content script + CSS are present, THEN send
+// exactly one TOGGLE. We do not branch on "did a ping fail in the right way".
+//
+// Why this is robust:
+//   - On most pages the content script already auto-injected (manifest matches
+//     <all_urls>). Re-running content.js via executeScript is a harmless no-op
+//     because the script's top-level IIFE guards on window.__jfOverlayInjected
+//     and returns immediately, so no duplicate overlay or duplicate listeners.
+//   - On heavy pages (e.g. job-boards.greenhouse.io/embed/job_app) the page can
+//     stay main-thread-busy long enough that Chrome never fires document_idle,
+//     so the declarative content script never auto-injects. injectImmediately
+//     bypasses that idle wait and forces injection now.
+//   - Because we send TOGGLE exactly once (never twice), the previous
+//     double-toggle bug — where the overlay flashed open then closed in one
+//     click — cannot occur.
+//
+// executeScript on the active tab is authorized by the activeTab permission,
+// which is granted on action-icon click, so no broad host_permissions entry is
+// required. Restricted pages (chrome://, the Web Store, view-source:) reject
+// injection; we log and bail.
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
-  try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE' });
-    return;
-  } catch (e) {
-    // Only fall through to on-demand injection when the error is specifically
-    // "no receiver". Any other error (notably "The message port closed before
-    // a response was received") means the content script IS there and almost
-    // certainly already handled the TOGGLE — re-injecting and re-sending would
-    // fire a SECOND TOGGLE that cancels the first, making the overlay look
-    // like it never opened.
-    const msg = (e && e.message) || '';
-    const noReceiver = /Receiving end does not exist|Could not establish connection/i.test(msg);
-    if (!noReceiver) {
-      // Content script handled TOGGLE; we just didn't get a clean response.
-      // Nothing more to do — bail out without re-injecting.
-      return;
-    }
-  }
+
+  let injected = true;
   try {
     await chrome.scripting.insertCSS({
       target: { tabId: tab.id },
@@ -339,11 +334,21 @@ chrome.action.onClicked.addListener(async (tab) => {
       files: ['content.js'],
       injectImmediately: true
     });
+  } catch (e) {
+    // Could be a restricted page, or the script may already be present and the
+    // failure is benign. Don't give up — still try to message any existing
+    // instance below.
+    injected = false;
+    console.warn('[JobFilter] inject step failed:', e?.message || e, '| url:', tab.url);
+  }
+
+  try {
     await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE' });
   } catch (e) {
-    // Restricted page (chrome://, Web Store, view-source:) or an injection
-    // error — surface it in the service-worker log so we can diagnose.
-    console.warn('[JobFilter] On-demand injection failed:', e?.message || e);
+    console.warn(
+      '[JobFilter] TOGGLE send failed:', e?.message || e,
+      '| injected:', injected, '| url:', tab.url
+    );
   }
 });
 

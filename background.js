@@ -182,6 +182,61 @@ function findTableRange(meta, tableName) {
   return { range: null, tablesSeen };
 }
 
+// Decode HTML entities and strip tags without a DOM (service workers have no
+// DOMParser). Good enough to turn Greenhouse's HTML JD content into plain text
+// for the model.
+function htmlToText(html) {
+  let s = String(html || '');
+  s = s.replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, ' ');
+  s = s.replace(/<[^>]+>/g, ' ');
+  const entities = {
+    '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>',
+    '&quot;': '"', '&#39;': "'", '&apos;': "'", '&mdash;': '—',
+    '&ndash;': '–', '&rsquo;': '’', '&lsquo;': '‘', '&hellip;': '…'
+  };
+  s = s.replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;|&apos;|&mdash;|&ndash;|&rsquo;|&lsquo;|&hellip;/g, (m) => entities[m]);
+  s = s.replace(/&#(\d+);/g, (_, n) => {
+    const code = parseInt(n, 10);
+    return Number.isFinite(code) ? String.fromCodePoint(code) : '';
+  });
+  return s.replace(/[ \t\f\v]+/g, ' ').replace(/\s*\n\s*/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// Fetch a Greenhouse-hosted JD via the public boards API. Works for postings
+// embedded into a company's own careers site through a cross-origin iframe,
+// which we otherwise can't scrape. Returns plain text, or throws.
+async function fetchGreenhouseJd({ boardToken, jobId }) {
+  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(boardToken)}/jobs/${encodeURIComponent(jobId)}?content=true`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    throw new Error(`Greenhouse API ${res.status} for board "${boardToken}" job ${jobId}`);
+  }
+  const data = await res.json();
+  const title = data?.title ? `Job Title: ${data.title}` : '';
+  const loc = data?.location?.name ? `Location: ${data.location.name}` : '';
+  const body = htmlToText(data?.content || '');
+  const composed = [title, loc, body].filter(Boolean).join('\n');
+  if (!body) throw new Error('Greenhouse API returned no job content.');
+  return composed;
+}
+
+// Prefer the Greenhouse API text when the page handed us a valid embed ref;
+// fall back to the scraped page text on any failure so behavior degrades
+// gracefully rather than erroring.
+async function resolveJdText(payload, maxChars) {
+  const ref = payload && payload.greenhouseRef;
+  const scraped = (payload && payload.text) || '';
+  if (ref && ref.boardToken && ref.jobId) {
+    try {
+      const gh = await fetchGreenhouseJd(ref);
+      if (gh && gh.length > 0) return gh.slice(0, maxChars);
+    } catch (e) {
+      console.warn('[JobFilter] Greenhouse JD fetch failed, using scraped text:', e?.message || e);
+    }
+  }
+  return scraped.slice(0, maxChars);
+}
+
 async function handleCheckJd(payload) {
   const { geminiApiKey, geminiModel, activeResumeId, resumes } = await getStorage([
     'geminiApiKey', 'geminiModel', 'activeResumeId', 'resumes'
@@ -197,7 +252,7 @@ async function handleCheckJd(payload) {
     return { success: false, error: 'No active resume selected. Open the overlay menu or Options to pick one.' };
   }
   const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
-  const jdText = (payload.text || '').slice(0, 12000);
+  const jdText = await resolveJdText(payload, 12000);
   const systemPrompt = buildCheckJdSystem(active.parsedText);
   const userMsg = `Here is the Job Description:\n${jdText}`;
   try {
@@ -209,8 +264,8 @@ async function handleCheckJd(payload) {
 }
 
 async function handleLogJob(payload) {
-  const { geminiApiKey, geminiModel, sheetId, sheetTableName } = await getStorage([
-    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTableName'
+  const { geminiApiKey, geminiModel, sheetId, sheetTableNameIntern, sheetTableNameFullTime } = await getStorage([
+    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTableNameIntern', 'sheetTableNameFullTime'
   ]);
   if (!geminiApiKey) {
     return { success: false, error: 'Set your API key in Options (right-click extension icon → Options)' };
@@ -219,13 +274,16 @@ async function handleLogJob(payload) {
     return { success: false, error: 'Set your Sheet ID in Options first' };
   }
   const model = (geminiModel || '').trim() || GEMINI_MODEL_DEFAULT;
-  const tableName = (sheetTableName || '').trim();
-  const pageText = (payload.text || '').slice(0, 8000);
+  // Route to the intern or full-time table based on which Log button was clicked.
+  const isFullTime = payload.role === 'fulltime';
+  const tableName = ((isFullTime ? sheetTableNameFullTime : sheetTableNameIntern) || '').trim();
 
   // Run Gemini extraction concurrently with Sheets context setup (auth → metadata → range).
   // Both legs are independent; the final values:append needs results from both, so we
-  // gate on Promise.all.
-  const geminiPromise = callGeminiJsonWithRetry(geminiApiKey, model, LOG_JOB_SYSTEM, pageText)
+  // gate on Promise.all. resolveJdText may fetch the Greenhouse API first, but the
+  // Sheets leg doesn't depend on the JD text so it still starts in parallel.
+  const geminiPromise = resolveJdText(payload, 8000)
+    .then((pageText) => callGeminiJsonWithRetry(geminiApiKey, model, LOG_JOB_SYSTEM, pageText))
     .catch((e) => { throw new Error(`Job extraction failed: ${e.message || e}`); });
 
   const sheetsContextPromise = (async () => {

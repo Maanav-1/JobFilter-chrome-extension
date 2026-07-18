@@ -90,7 +90,10 @@
         </div>
         <div class="jf-body">
           <button class="jf-btn jf-btn-primary" data-action="check" type="button">Check this JD</button>
-          <button class="jf-btn jf-btn-outline" data-action="log" type="button">Log application</button>
+          <div class="jf-log-row">
+            <button class="jf-btn jf-btn-outline" data-action="log" data-role="intern" type="button">Log intern</button>
+            <button class="jf-btn jf-btn-outline" data-action="log" data-role="fulltime" type="button">Log full-time</button>
+          </div>
           <div class="jf-result" data-empty="true"></div>
           <div class="jf-resume-row">
             <button class="jf-resume-label" type="button" aria-haspopup="listbox">
@@ -110,7 +113,9 @@
 
     $('.jf-close').addEventListener('click', hideOverlay);
     $('[data-action="check"]').addEventListener('click', onCheckClick);
-    $('[data-action="log"]').addEventListener('click', onLogClick);
+    root.querySelectorAll('[data-action="log"]').forEach((btn) => {
+      btn.addEventListener('click', () => onLogClick(btn.getAttribute('data-role')));
+    });
     $('.jf-drag').addEventListener('mousedown', onDragStart);
     resumeLabelEl.addEventListener('click', toggleResumeMenu);
     document.addEventListener('mousedown', onDocClickForMenu, true);
@@ -327,11 +332,59 @@
     return text.length > maxChars ? text.slice(0, maxChars) : text;
   }
 
+  // Greenhouse job boards are commonly embedded into a company's own careers page
+  // via a cross-origin <iframe src="https://boards.greenhouse.io/embed/job_app?...">.
+  // body.innerText on the host page never sees the iframe's content, so the scraped
+  // text is just the company shell with no role info. We can't read the cross-origin
+  // frame, but we CAN read the board token and job id from the top-frame DOM/URL and
+  // hand them to the background worker, which fetches the real JD from Greenhouse's
+  // public JSON API. Returns { boardToken, jobId } or null.
+  function getGreenhouseEmbedRef() {
+    let boardToken = null;
+    let jobId = null;
+
+    // Job id: ?gh_jid=... on the host page URL is the canonical signal.
+    try {
+      jobId = new URLSearchParams(window.location.search).get('gh_jid') || null;
+    } catch (_) { /* malformed search string */ }
+
+    // Board token: the embed loader script carries ?for=<token>.
+    const script = document.querySelector(
+      'script[src*="greenhouse.io/embed/job_board/js"], script[src*="greenhouse.io/embed/job_board"]'
+    );
+    if (script && script.src) {
+      const m = script.src.match(/[?&]for=([^&]+)/);
+      if (m) { try { boardToken = decodeURIComponent(m[1]); } catch (_) { boardToken = m[1]; } }
+    }
+
+    // Fallback / also fills job id: the embed iframe src carries both for= and token=.
+    // iframe.src is a plain string attribute — readable even though the frame is
+    // cross-origin (we only read the attribute, never contentDocument).
+    const iframe = document.querySelector(
+      'iframe#grnhse_iframe, iframe[src*="greenhouse.io/embed/job_app"]'
+    );
+    if (iframe && iframe.src) {
+      try {
+        const u = new URL(iframe.src, window.location.href);
+        if (!boardToken) boardToken = u.searchParams.get('for');
+        if (!jobId) jobId = u.searchParams.get('token');
+      } catch (_) { /* unparseable iframe src */ }
+    }
+
+    if (boardToken && jobId) return { boardToken, jobId };
+    return null;
+  }
+
   function onCheckClick() {
     setLoading('Checking JD…');
     startPendingTimeout(60);
     safeSendMessage(
-      { type: 'CHECK_JD', text: getPageText(20000), url: window.location.href },
+      {
+        type: 'CHECK_JD',
+        text: getPageText(20000),
+        url: window.location.href,
+        greenhouseRef: getGreenhouseEmbedRef()
+      },
       (resp, err) => {
         clearPendingTimeout();
         if (err) { setError(err.message); return; }
@@ -341,11 +394,18 @@
     );
   }
 
-  function onLogClick() {
-    setLoading('Logging job…');
+  function onLogClick(role) {
+    const label = role === 'fulltime' ? 'full-time' : 'intern';
+    setLoading(`Logging ${label} job…`);
     startPendingTimeout(120);
     safeSendMessage(
-      { type: 'LOG_JOB', text: getPageText(15000), url: window.location.href },
+      {
+        type: 'LOG_JOB',
+        role,
+        text: getPageText(15000),
+        url: window.location.href,
+        greenhouseRef: getGreenhouseEmbedRef()
+      },
       (resp, err) => {
         clearPendingTimeout();
         if (err) { setError(err.message); return; }

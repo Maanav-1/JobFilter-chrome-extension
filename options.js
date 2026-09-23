@@ -1,11 +1,12 @@
-const GEMINI_MODEL_DEFAULT = 'gemini-3.1-flash-lite-preview';
+const GEMINI_MODEL_DEFAULT = 'gemini-flash-lite-latest';
 const geminiEndpoint = (model) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
 const apiKeyInput = document.getElementById('geminiApiKey');
 const modelInput = document.getElementById('geminiModel');
 const sheetIdInput = document.getElementById('sheetId');
-const sheetTableNameInput = document.getElementById('sheetTableName');
+const sheetTableNameInternInput = document.getElementById('sheetTableNameIntern');
+const sheetTableNameFullTimeInput = document.getElementById('sheetTableNameFullTime');
 const saveBtn = document.getElementById('saveConfig');
 const configToast = document.getElementById('configToast');
 
@@ -40,23 +41,30 @@ function clearUploadError() {
 }
 
 async function loadConfig() {
-  const { geminiApiKey, geminiModel, sheetId, sheetTableName } = await getStorage([
-    'geminiApiKey', 'geminiModel', 'sheetId', 'sheetTableName'
-  ]);
+  const { geminiApiKey, geminiModel, sheetId, sheetTableNameIntern, sheetTableNameFullTime, sheetTableName } =
+    await getStorage([
+      'geminiApiKey', 'geminiModel', 'sheetId',
+      'sheetTableNameIntern', 'sheetTableNameFullTime', 'sheetTableName'
+    ]);
   if (geminiApiKey) apiKeyInput.value = geminiApiKey;
   if (geminiModel) modelInput.value = geminiModel;
   if (sheetId) sheetIdInput.value = sheetId;
-  if (sheetTableName) sheetTableNameInput.value = sheetTableName;
+  // Migrate the old single-table setting: it tracked intern roles, so carry it
+  // into the intern field when the new key hasn't been set yet.
+  if (sheetTableNameIntern) sheetTableNameInternInput.value = sheetTableNameIntern;
+  else if (sheetTableName) sheetTableNameInternInput.value = sheetTableName;
+  if (sheetTableNameFullTime) sheetTableNameFullTimeInput.value = sheetTableNameFullTime;
 }
 
 saveBtn.addEventListener('click', async () => {
   const geminiApiKey = apiKeyInput.value.trim();
   const geminiModel = modelInput.value.trim();
   const sheetId = sheetIdInput.value.trim();
-  const sheetTableName = sheetTableNameInput.value.trim();
-  await setStorage({ geminiApiKey, geminiModel, sheetId, sheetTableName });
-  // Drop the obsolete sheetTabName key from a previous version so it can't shadow the new field.
-  chrome.storage.local.remove('sheetTabName');
+  const sheetTableNameIntern = sheetTableNameInternInput.value.trim();
+  const sheetTableNameFullTime = sheetTableNameFullTimeInput.value.trim();
+  await setStorage({ geminiApiKey, geminiModel, sheetId, sheetTableNameIntern, sheetTableNameFullTime });
+  // Drop obsolete keys from previous versions so they can't shadow the new fields.
+  chrome.storage.local.remove(['sheetTabName', 'sheetTableName']);
   showToast(configToast, 'Saved ✓', false);
 });
 

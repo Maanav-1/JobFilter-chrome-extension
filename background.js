@@ -1,4 +1,4 @@
-const GEMINI_MODEL_DEFAULT = 'gemini-3.1-flash-lite';
+const GEMINI_MODEL_DEFAULT = 'gemini-flash-lite-latest';
 const geminiEndpoint = (model) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 

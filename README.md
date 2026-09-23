@@ -79,7 +79,7 @@ chrome-extension/
 1. Right-click the JobFilter icon → **Options**.
 2. Fill in:
    - **Gemini API key**
-   - **Gemini model** (default: `gemini-3.1-flash-lite-preview`; leave blank to use the default)
+   - **Gemini model** (default: `gemini-flash-lite-latest`; leave blank to use the default)
    - **Google Sheet ID**
    - **Table name** (e.g. `Table3` — must match the Sheets-native Table name exactly, case-sensitive)
 3. Save.
@@ -122,9 +122,10 @@ Everything lives in `chrome.storage.local`:
 ```js
 {
   geminiApiKey: "string",
-  geminiModel: "string",          // optional; defaults to gemini-3.1-flash-lite-preview
+  geminiModel: "string",          // optional; defaults to gemini-flash-lite-latest
   sheetId: "string",
-  sheetTableName: "string",       // name of a Sheets-native Table
+  sheetTableNameIntern: "string",   // Sheets-native Table for intern roles ("Log intern" button)
+  sheetTableNameFullTime: "string", // Sheets-native Table for full-time roles ("Log full-time" button)
   resumes: [
     { id, name, parsedText, uploadDate, charCount }
   ],

@@ -136,6 +136,12 @@
 }
 #jf-overlay .jf-btn-outline:hover { background: var(--jf-soft-border); }
 
+#jf-overlay .jf-log-row {
+  display: flex;
+  gap: 8px;
+}
+#jf-overlay .jf-log-row .jf-btn { flex: 1; }
+
 #jf-overlay .jf-result[data-empty="true"] { display: none; }
 #jf-overlay .jf-result {
   margin-top: 2px;

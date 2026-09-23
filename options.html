@@ -20,16 +20,20 @@
         <input id="geminiApiKey" type="password" autocomplete="off" placeholder="AIza..." />
       </label>
       <label class="field">
-        <span>Gemini model <em class="field-hint">(leave blank to use default: gemini-3.1-flash-lite-preview)</em></span>
-        <input id="geminiModel" type="text" autocomplete="off" placeholder="gemini-3.1-flash-lite-preview" />
+        <span>Gemini model <em class="field-hint">(leave blank to use default: gemini-flash-lite-latest)</em></span>
+        <input id="geminiModel" type="text" autocomplete="off" placeholder="gemini-flash-lite-latest" />
       </label>
       <label class="field">
         <span>Google Sheet ID</span>
         <input id="sheetId" type="text" autocomplete="off" placeholder="The long string between /d/ and /edit in your Sheet URL" />
       </label>
       <label class="field">
-        <span>Table name <em class="field-hint">(name of a Sheets-native Table, e.g. "Table3" — JobFilter resolves it to the table's current A1 range and inserts inside its bounds. Leave blank to fall back to first tab A:F.)</em></span>
-        <input id="sheetTableName" type="text" autocomplete="off" placeholder="Table3" />
+        <span>Intern table name <em class="field-hint">(Sheets-native Table for internship / co-op roles, e.g. "Table3" — the "Log intern" button writes here. Leave blank to fall back to first tab A:F.)</em></span>
+        <input id="sheetTableNameIntern" type="text" autocomplete="off" placeholder="Table3" />
+      </label>
+      <label class="field">
+        <span>Full-time table name <em class="field-hint">(Sheets-native Table for full-time roles, e.g. "FullTimeTracker" — the "Log full-time" button writes here. Leave blank to fall back to first tab A:F.)</em></span>
+        <input id="sheetTableNameFullTime" type="text" autocomplete="off" placeholder="FullTimeTracker" />
       </label>
       <div class="row-actions">
         <button id="saveConfig" class="btn primary" type="button">Save</button>
